@@ -72,7 +72,7 @@ instance MonadBaseControl b m => MonadBaseControl b (Timeout m) where
 -- |
 -- Run the timeout transformer
 runTimeout
-  :: (Functor m, MonadBaseControl IO m, MonadIO m)
+  :: (MonadBaseControl IO m, MonadIO m)
   => Microseconds -- ^ Microseconds in the future
   -> Timeout m a  -- ^ Timeout action to run
   -> m (Either TimeoutException a) -- ^ The result or a 'TimeoutException'
@@ -84,7 +84,7 @@ runTimeout (Microseconds us) (Timeout action) = do
     Just eventMgr' -> do
       state <- liftIO $ do
         tid <- myThreadId
-        uni <- fmap TimeoutException newUnique
+        uni <- liftM TimeoutException newUnique
         key <- E.registerTimeout eventMgr' us (throwTo tid uni)
         return $! TimeoutState{timeoutManager = eventMgr', timeoutKey = key}
       try $ do
