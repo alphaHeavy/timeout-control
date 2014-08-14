@@ -16,9 +16,10 @@ Cabal-version:       >= 1.10
 Library
   Default-Language:  Haskell2010
   Exposed-modules:   System.Timeout.Control
+  Other-modules:     System.Timeout.Event
   Build-depends:     base              >= 3     && < 5,
-                     ghc-prim          == 0.2.*,
-                     lifted-base       == 0.1.*,
+                     ghc-prim          >= 0.2,
+                     lifted-base       >= 0.1,
                      monad-control     == 0.3.*,
                      mtl               >= 2.0   && < 3.0,
                      transformers-base >= 0.4.1 && < 0.5

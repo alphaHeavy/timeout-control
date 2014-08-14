@@ -30,7 +30,8 @@ import Control.Monad.Reader (MonadReader, ReaderT, ask, runReaderT)
 import Control.Monad.Trans (MonadIO, MonadTrans, liftIO)
 import Data.Typeable (Typeable)
 import Data.Unique (Unique, newUnique)
-import qualified GHC.Event as E (EventManager, TimeoutKey, getSystemEventManager, registerTimeout, unregisterTimeout, updateTimeout)
+import qualified GHC.Event as E (TimeoutKey)
+import System.Timeout.Event
 
 -- |
 -- A duration measured in microseconds
@@ -49,7 +50,7 @@ instance Show TimeoutException where
   show MissingSystemEventManagerException{} = "MissingSystemEventManagerException"
 
 
-data TimeoutState = TimeoutState {timeoutManager :: E.EventManager, timeoutKey :: E.TimeoutKey}
+data TimeoutState = TimeoutState {timeoutManager :: SomeTimerManager2, timeoutKey :: E.TimeoutKey}
 
 newtype Timeout m a = Timeout {unTimeout :: ReaderT TimeoutState m a}
   deriving (Applicative, Functor, Monad, MonadReader TimeoutState, MonadIO, MonadTrans)
@@ -78,16 +79,13 @@ runTimeout
   -> m (Either TimeoutException a) -- ^ The result or a 'TimeoutException'
 {-# INLINEABLE runTimeout #-}
 runTimeout (Microseconds us) (Timeout action) = do
-  eventMgr <- liftIO $ E.getSystemEventManager
-  case eventMgr of
-    Nothing        -> return . Left $ MissingSystemEventManagerException
-    Just eventMgr' -> do
-      state <- liftIO $ do
+  tm2@(SomeTimerManager2 eventMgr) <- liftIO newTimeoutManager2
+  state <- liftIO $ do
         tid <- myThreadId
         uni <- liftM TimeoutException newUnique
-        key <- E.registerTimeout eventMgr' us (throwTo tid uni)
-        return $! TimeoutState{timeoutManager = eventMgr', timeoutKey = key}
-      try $ do
+        key <- (registerTimeout eventMgr) (timerManager eventMgr) us (throwTo tid uni)
+        return $! TimeoutState{timeoutManager = tm2, timeoutKey = key}
+  try $ do
          val <- runReaderT action state
          unregisterTimeout_ state
          return $! val
@@ -101,11 +99,13 @@ updateTimeout
 {-# INLINE updateTimeout #-}
 updateTimeout (Microseconds us) = do
   TimeoutState{timeoutManager, timeoutKey} <- ask
-  liftIO $ E.updateTimeout timeoutManager timeoutKey us
+  case timeoutManager of
+    (SomeTimerManager2 tm) -> liftIO $ (updateTimeout2 tm) (timerManager tm) timeoutKey us
 
 unregisterTimeout_ :: MonadIO m => TimeoutState -> m ()
 unregisterTimeout_ TimeoutState{timeoutManager, timeoutKey} =
-  liftIO $ E.unregisterTimeout timeoutManager timeoutKey
+  case timeoutManager of
+    (SomeTimerManager2 tm2) -> liftIO $ (unregisterTimeout tm2) (timerManager tm2) timeoutKey
 
 {-
  -
