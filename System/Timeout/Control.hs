@@ -56,18 +56,17 @@ newtype Timeout m a = Timeout {unTimeout :: ReaderT TimeoutState m a}
   deriving (Applicative, Functor, Monad, MonadReader TimeoutState, MonadIO, MonadTrans)
 
 instance MonadTransControl Timeout where
-  newtype StT Timeout a = StTimeoutT {unStAction :: StT (ReaderT TimeoutState) a}
-  liftWith f = Timeout $ liftWith $ \runReader' ->
-                           f (liftM StTimeoutT . runReader' . unTimeout)
-  restoreT = Timeout . restoreT . liftM unStAction
+  type StT Timeout a = StT (ReaderT TimeoutState) a
+  liftWith = defaultLiftWith Timeout unTimeout
+  restoreT = defaultRestoreT Timeout
 
 instance MonadBase b m => MonadBase b (Timeout m) where
   liftBase = liftBaseDefault
 
 instance MonadBaseControl b m => MonadBaseControl b (Timeout m) where
-  newtype StM (Timeout m) a = StMT {unStMT :: ComposeSt Timeout m a}
-  liftBaseWith = defaultLiftBaseWith StMT
-  restoreM     = defaultRestoreM   unStMT
+  type StM (Timeout m) a = ComposeSt Timeout m a
+  liftBaseWith = defaultLiftBaseWith
+  restoreM     = defaultRestoreM
 
 
 -- |
