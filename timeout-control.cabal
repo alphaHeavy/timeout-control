@@ -1,5 +1,5 @@
 Name:                timeout-control
-Version:             0.1
+Version:             0.2
 Synopsis:            Updatable timeouts as a Monad transformer
 Description:         Add updatable timeout functionality to a Monad transformer stack layered on IO
 License:             BSD3
